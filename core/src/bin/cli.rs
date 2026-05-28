@@ -941,6 +941,8 @@ async fn handle_aggregator_call(url: String, command: AggregatorCommands) {
             verification_signature,
             operator_xonly_pks,
         } => {
+            use clementine_core::rpc::clementine::operator_withrawal_response::Response;
+
             println!("Processing withdrawal with id {withdrawal_id}");
 
             let mut input_outpoint_txid_bytes =
@@ -996,7 +998,18 @@ async fn handle_aggregator_call(url: String, command: AggregatorCommands) {
             let withdraw_responses = response.get_ref().withdraw_responses.clone();
 
             for (i, result) in withdraw_responses.iter().enumerate() {
-                println!("Operator {i}: {result:?}");
+                print!("Operator {i}: ");
+                if let Some(response) = result.response.clone() {
+                    match response {
+                        Response::RawTx(raw_tx) => {
+                            let tx: bitcoin::Transaction = bitcoin::consensus::encode::deserialize(&raw_tx.raw_tx).unwrap();
+                            println!("txid={}, raw_tx={}", tx.compute_txid ().to_string(), hex::encode(raw_tx.raw_tx));
+                        },
+                        Response::Error(e) => {
+                            println!("error={}", e);
+                        }
+                    }
+                }
             }
         }
         AggregatorCommands::GetEntityStatuses { restart_tasks } => {
@@ -1355,7 +1368,13 @@ async fn handle_bitcoin_call(url: String, command: BitcoinCommands) {
             {
                 Ok(result) => {
                     println!("CPFP package submitted successfully");
-                    println!("Package result: {result:?}");
+                    if let Ok(json) = serde_json::to_string(&result) {
+                        println!("@@@ SUBMIT_RESULT_BEGIN");
+                        println!("{}", json);
+                        println!("@@@ SUBMIT_RESULT_END");
+                    } else {
+                        println!("Package result: {result:?}");
+                    }
                     let parent_txid = tx.compute_txid();
                     println!("Parent transaction TXID: {parent_txid}");
                     let child_txid = signed_child_tx.compute_txid();
