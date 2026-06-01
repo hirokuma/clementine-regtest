@@ -22,3 +22,9 @@ out.json*
 *test.dockerfile
 
 core/certs/
+
+emergency_stop_private.pem
+emergency_stop_public.pem
+.env.regtest-hirokuma
+.myenv
+/withdraw-*.env

@@ -1,7 +1,49 @@
 #!/bin/bash
 
+# Server check
+loops=0
+while :; do
+  cnt=$(ss -natl | grep -c 17000 || true)
+  if [[ $cnt -eq 0 ]]; then
+    loops=$((loops+1))
+    echo "Aggregator not running."
+    sleep 5
+    continue
+  fi
+  cnt=$(ss -natl | grep -c 12345 || true)
+  if [[ $cnt -eq 0 ]]; then
+    loops=$((loops+1))
+    echo "Sequencer not running."
+    sleep 5
+    continue
+  fi
+  break
+done
+if [[ $loops -gt 0 ]]; then
+  # 直後は失敗しやすい
+  sleep 10
+fi
+
 # CPFP Deposit Flow Script for Clementine
 set -e  # Exit on any error
+
+source ./myenv.sh
+
+echo "------------------------------------------------------------deposit begin"
+echo "🌞実行日時: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+echo "Bitcoin block count:      $($BCLI getblockcount)"
+echo "L2 block number:          $(cast block-number --rpc-url http://127.0.0.1:12345)"
+echo
+
+# EVMアドレスが0xから始まっていたら取り除く
+echo "Citrea address:           $EVM_ADDR"
+if [[ -z $EVM_ADDR ]]; then
+  echo "no EVM_ADDR environment."
+  exit 1
+fi
+if [[ ${EVM_ADDR:0:2} == "0x" ]]; then
+  EVM_ADDR=${EVM_ADDR:2}
+fi
 
 # Configuration
 AGGREGATOR_URL="https://127.0.0.1:17000"
@@ -29,7 +71,9 @@ echo "🧱 Step 1: Setup Aggregator"
 cargo run --bin clementine-cli -- --node-url $AGGREGATOR_URL aggregator setup
 
 echo "📬 Step 2: Get Deposit Address"
-DEPOSIT_ADDRESS=$(cargo run --bin clementine-cli -- --node-url $AGGREGATOR_URL aggregator get-deposit-address | grep -o 'bcrt1[a-zA-Z0-9]*')
+DEPOSIT_ADDRESS=$(cargo run --bin clementine-cli -- --node-url $AGGREGATOR_URL aggregator get-deposit-address --network regtest \
+  --recovery-taproot-address $DEST_ADDR \
+  --evm-address $EVM_ADDR | grep -o 'bcrt1[a-zA-Z0-9]*')
 echo "Deposit address: $DEPOSIT_ADDRESS"
 
 echo "🪙 Step 3: Send Deposit"
@@ -46,6 +90,8 @@ echo "VOUT: $VOUT_INDEX"
 STEP_START=$(date +%s)
 echo "📥 Step 4.5: Registering deposit on aggregator..."
 MOVE_TX_RAW=$(cargo run --bin clementine-cli -- --node-url $AGGREGATOR_URL aggregator new-deposit \
+  --recovery-taproot-address $DEST_ADDR \
+  --evm-address $EVM_ADDR \
   --deposit-outpoint-txid $DEPOSIT_TXID \
   --deposit-outpoint-vout $VOUT_INDEX | awk '/Please send manually:/ { print $NF }')
 STEP_END=$(date +%s)
@@ -96,8 +142,8 @@ if [ -z "$PARENT_TXID" ]; then
 fi
 
 echo "Step 8: Get Calldata for Deposit"
-CALLDATA=$(clementine --network regtest deposit get-deposit-params $PARENT_TXID \
-  $BITCOIN_RPC_URL $BITCOIN_RPC_USER $BITCOIN_RPC_PASSWORD | tail -n1 | tr -d '\n\r ' | xargs)
+CALLDATA=$($CLEMENTINE_CLI deposit get-deposit-params --network regtest $PARENT_TXID \
+  | sed 's/^Deposit parameters hex: //' | tr -d '\n\r ')
 
 if [ -z "$CALLDATA" ]; then
   echo "❌ Failed to get deposit parameters!"
@@ -119,3 +165,16 @@ else
   echo "❌ Calldata submission failed"
   exit 1
 fi
+
+sleep 5
+
+echo "Bitcoin block count:      $($BCLI getblockcount)"
+echo "L2 block number:          $(cast block-number --rpc-url http://127.0.0.1:12345)"
+echo "cBTC:                     $(cast balance $EVM_ADDR --rpc-url http://127.0.0.1:12345)"
+echo "EVM Address:              0x$EVM_ADDR"
+echo "Recovery-taproot-address: $DEST_ADDR"
+echo "Deposit Address:          $DEPOSIT_ADDRESS"
+echo "Deposit Outpoint:         $DEPOSIT_TXID:$VOUT_INDEX"
+
+echo "🌞実行日時: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+echo "------------------------------------------------------------deposit end"

@@ -18,7 +18,7 @@ x-clementine: &clementine_regtest
       condition: service_started
 
   env_file:
-    - ./configs/regtest/.env.regtest
+    - ./configs/regtest/.env.regtest-hirokuma
 
   volumes:
     - ../../bitvm_cache.bin:/bitvm_cache.bin
@@ -52,6 +52,8 @@ services:
     image: 'postgres:latest'
     attach: false
     container_name: postgres_db_regtest
+    ports:
+      - "5432:5432"
     volumes:
       - ./configs/regtest/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/init.sh
     environment:
@@ -74,7 +76,7 @@ services:
     container_name: bitcoin_regtest
     ports:
       - "20443:20443"
-      - "20444:20444"
+      - "20444:18444"
     volumes:
       - ../init-bitcoin.sh:/init-bitcoin.sh
       - ../docker-entrypoint.sh:/docker-entrypoint.sh

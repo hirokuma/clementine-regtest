@@ -1,0 +1,13 @@
+# deposit
+EVM_ADDR="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" # Avail default account#2(#0と#1は初期状態でbalanceあり)
+# memo: EVM_ADDRの秘密鍵 for withdraw
+# PRIV=5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+
+# withdraw
+DEST_ADDR="bcrt1pqcfunylfm2x8vng70nz0lmhz35ypu8hzaw6uw5rh8mwm8yy9czqs72rtx2"
+# PRIV=5555555555555555555555555555555555555555555555555555555555555555
+# PUB=029ac20335eb38768d2052be1dbbc3c8f6178407458e51e6b4ad22f1d91758895b
+# SPK=51200613c993e9da8c764d1e7cc4ffeee28d081e1ee2ebb5c750773eddb39085c081
+
+# 自分でビルドしたclementine-cliを使う
+#CLEMENTINE_CLI="../clementine-cli/target/debug/clementine-cli"
